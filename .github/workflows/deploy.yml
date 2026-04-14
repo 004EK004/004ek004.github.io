@@ -6,25 +6,38 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Update root files for branch-based Pages deployment
+        run: |
+          cp dist/index.html ./index.html
+          cp -r dist/assets ./assets
+          cp dist/favicon.svg ./favicon.svg
+          touch .nojekyll
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -f index.html assets/ favicon.svg .nojekyll
+          git diff --staged --quiet || git commit -m "chore: update root build files [skip ci]"
+          git push
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
